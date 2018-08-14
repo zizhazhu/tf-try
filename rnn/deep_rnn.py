@@ -35,5 +35,4 @@ for i in range(epochs):
 X_new = [i for i in range(1, 26)]
 X_new = np.array(X_new, dtype=np.float32).reshape([1, -1, 1])
 outputs, states = tf.nn.dynamic_rnn(multi_cell, X_new, dtype=tf.float32)
-tf.nn.rnn_cell.
 print(outputs)
