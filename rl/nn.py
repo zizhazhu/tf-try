@@ -54,9 +54,10 @@ class nnPolicier(tf.keras.Model):
 env = gym.make('CartPole-v0')
 nn_policy = nnPolicier()
 
-for iteration in range(1000):
+for iteration in range(250):
     all_rewards = []
     all_gradients = []
+    steps = 0
     for episode in range(10):
         rewards = []
         gradients = []
@@ -68,12 +69,16 @@ for iteration in range(1000):
             gradient = tape.gradient(loss, nn_policy.variables)
             gradient = [gradient_one.numpy() for gradient_one in gradient]
             obs, reward, done, info = env.step(action.numpy()[0][0])
+            env.render()
             rewards.append(reward)
             gradients.append(gradient)
             if done:
+                steps += step
                 break
         all_rewards.append(rewards)
         all_gradients.append(gradients)
+
+    print('{:4d} it: run {}'.format(iteration, steps))
     all_rewards = discount_and_normalize_rewards(all_rewards)
     result_gradients = []
     for k in range(len(all_gradients[0][0])):
