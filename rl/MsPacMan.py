@@ -1,7 +1,9 @@
+import os
 from collections import namedtuple, deque
 import numpy as np
 import gym
 import tensorflow as tf
+import tensorflow.contrib as tfc
 
 
 mspacman_color = np.array([210, 164, 74]).mean()
@@ -57,10 +59,11 @@ class QModel(tf.keras.Model):
         self.conv_layers = []
         for layer_conf in conv_layers:
             self.conv_layers.append(tf.layers.Conv2D(layer_conf.filter_n, layer_conf.kernel_size,
-                                     layer_conf.stride, layer_conf.padding, activation=tf.nn.relu))
+                                                     layer_conf.stride, layer_conf.padding, activation=tf.nn.relu,
+                                                     kernel_initializer=tf.variance_scaling_initializer()))
         self.dense_layer = []
-        self.dense_layer.append(tf.layers.Dense(512, tf.nn.relu))
-        self.dense_layer.append(tf.layers.Dense(9))
+        self.dense_layer.append(tf.layers.Dense(512, tf.nn.relu, kernel_initializer=tf.variance_scaling_initializer()))
+        self.dense_layer.append(tf.layers.Dense(9, kernel_initializer=tf.variance_scaling_initializer()))
 
     def output(self, x_state):
         layer = tf.reshape(tf.convert_to_tensor(x_state), shape=(-1, 88, 80, 1))
@@ -83,10 +86,17 @@ class QModel(tf.keras.Model):
 
 tf.enable_eager_execution()
 
-q_network = QModel()
+q_network_actor = QModel()
+obs = env.reset()
+q_network_actor(preprocess_observation(obs))
+grads_list = []
 optimizer = tf.train.AdamOptimizer()
 done = True
 step = 0
+saver = tfc.eager.Saver(q_network_actor.variables)
+rewards = deque(maxlen=100)
+if os.path.isdir("./mspacman"):
+    saver.restore("./mspacman/save")
 while True:
     step += 1
     if done:
@@ -95,31 +105,37 @@ while True:
             obs, reward, done, info = env.step(0)
         state = preprocess_observation(obs)
 
-    q_values = q_network(state)
+    q_values = q_network_actor(state)
     action = epsilon_greedy(q_values, step)
 
     obs, reward, done, info = env.step(action)
     next_state = preprocess_observation(obs)
 
     replay_memory.append((state, action, reward, next_state, 1.0 - done))
+    rewards.append(reward)
     state = next_state
 
     env.render()
 
-    if len(replay_memory) < 1000:
+    if len(replay_memory) < 1000 or step % 3 != 0:
         continue
 
     x_state_batch, x_action_batch, reward_batch, x_next_state_batch, continue_batch = sample_memories(64)
-    next_q_values = q_network(x_next_state_batch)
+    next_q_values = q_network_actor(x_next_state_batch)
     max_next_q_batch = np.max(next_q_values, axis=1, keepdims=True)
     y_val = reward_batch + continue_batch * discount_rate * max_next_q_batch
     with tf.GradientTape() as tape:
-        loss = q_network.loss(x_state_batch, x_action_batch, y_val)
-    grads = tape.gradient(loss, q_network.variables)
-    optimizer.apply_gradients(
-        zip(grads, q_network.variables),
-        global_step=tf.train.get_or_create_global_step()
-    )
+        loss = q_network_actor.loss(x_state_batch, x_action_batch, y_val)
+    grads_list.append(tape.gradient(loss, q_network_actor.variables))
+
+    if step % 25 == 0:
+        for grads in grads_list:
+            optimizer.apply_gradients(
+                zip(grads, q_network_actor.variables),
+                global_step=tf.train.get_or_create_global_step()
+            )
+        grads_list.clear()
 
     if step % 100 == 0:
-        print("{}: {}".format(step, loss))
+        print("{}: {}, {}".format(step, loss, sum(rewards) / len(rewards)))
+        saver.save("./mspacman/save")
