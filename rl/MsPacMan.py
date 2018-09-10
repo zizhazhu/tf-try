@@ -53,6 +53,7 @@ def sample_memories(batch_size):
     return cols[0], cols[1], cols[2].reshape(-1, 1), cols[3], cols[4].reshape(-1, 1)
 
 
+# TODO: try resnet or densenet
 class QModel(tf.keras.Model):
     def __init__(self):
         super(QModel, self).__init__()
@@ -65,6 +66,7 @@ class QModel(tf.keras.Model):
         self.dense_layer.append(tf.layers.Dense(512, tf.nn.relu, kernel_initializer=tf.variance_scaling_initializer()))
         self.dense_layer.append(tf.layers.Dense(9, kernel_initializer=tf.variance_scaling_initializer()))
 
+    # TODO: add bn
     def output(self, x_state):
         layer = tf.reshape(tf.convert_to_tensor(x_state), shape=(-1, 88, 80, 1))
         for conv_layer in self.conv_layers:
@@ -74,6 +76,7 @@ class QModel(tf.keras.Model):
         outputs = self.dense_layer[1](hidden)
         return outputs
 
+    # TODO: simplify computation
     def loss(self, x_state, x_action, y):
         outputs = self.output(x_state)
         q_values = tf.reduce_sum(outputs * tf.one_hot(x_action, n_outputs, dtype=tf.float64), axis=1, keepdims=True)
@@ -93,6 +96,7 @@ grads_list = []
 optimizer = tf.train.AdamOptimizer()
 done = True
 step = 0
+# TODO: learn and try save with step
 saver = tfc.eager.Saver(q_network_actor.variables)
 rewards = deque(maxlen=100)
 if os.path.isdir("./mspacman"):
@@ -120,6 +124,7 @@ while True:
     if len(replay_memory) < 1000 or step % 3 != 0:
         continue
 
+    # TODO: use continue states
     x_state_batch, x_action_batch, reward_batch, x_next_state_batch, continue_batch = sample_memories(64)
     next_q_values = q_network_actor(x_next_state_batch)
     max_next_q_batch = np.max(next_q_values, axis=1, keepdims=True)
