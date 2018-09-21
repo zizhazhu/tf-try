@@ -12,31 +12,46 @@ args = parser.parse_args()
 tf.enable_eager_execution()
 
 n_inputs = 28 * 28
-n_hidden = (300, 150, 300)
+n_hidden = (300, 150)
 n_outputs = n_inputs
 
 learning_rate = 0.01
 l2_reg = 0.001
 
 
-class Stacked(tf.keras.Model):
+class Stacked(tf.keras.layers.Layer):
 
     def __init__(self, layers_units):
-        super().__init__()
-        initializer = tf.variance_scaling_initializer()
-        self.hidden = []
-        for layer_units in layers_units:
-            self.hidden.append(tf.layers.Dense(layer_units,
-                                               activation=tf.nn.elu,
-                                               kernel_initializer=initializer))
-        self.outputs = tf.layers.Dense(n_outputs)
+        super(Stacked, self).__init__()
+        self.layers_units = layers_units
 
-    def call(self, inputs):
+    def build(self, input_shape):
+        initializer = tf.variance_scaling_initializer()
+        self.all_weights = []
+        self.all_biases = []
+        last_units = n_inputs
+        for index, layer_units in enumerate(layers_units):
+            weights = self.add_weight('weights_{}'.format(index), [last_units, layer_units],
+                                      dtype=tf.float32, initializer=initializer)
+            self.all_weights.append(weights)
+            bias = self.add_weight('bias_{}'.format(index), [layer_units], dtype=tf.float32,
+                                   initializer=tf.zeros_initializer)
+            self.all_biases.append(bias)
+            last_units = layer_units
+        length = len(n_hidden)
+        for index in range(length, length * 2):
+            weights = tf.transpose(self.all_weights[length * 2 - index - 1])
+            self.all_weights.append(weights)
+            bias = self.add_weight('bias_{}'.format(index), [weights.get_shape().as_list()[1]],
+                                   dtype=tf.float32, initializer=tf.zeros_initializer)
+            self.all_biases.append(bias)
+        super().build(input_shape)
+
+    def call(self, inputs, **kwargs):
         layer = inputs
-        for dense_layer in self.hidden:
-            layer = dense_layer(layer)
-        outputs = self.outputs(layer)
-        return outputs
+        for i in range(len(self.all_weights)):
+            layer = layer @ self.all_weights[i] + self.all_biases[i]
+        return layer
 
     def loss(self, X, y):
         reconstruction_loss = tf.reduce_mean(tf.square(X - y))
