@@ -24,13 +24,13 @@ class Stacked(tf.keras.layers.Layer):
     def __init__(self, layers_units):
         super(Stacked, self).__init__()
         self.layers_units = layers_units
+        self.all_weights = []
+        self.all_biases = []
 
     def build(self, input_shape):
         initializer = tf.variance_scaling_initializer()
-        self.all_weights = []
-        self.all_biases = []
         last_units = n_inputs
-        for index, layer_units in enumerate(layers_units):
+        for index, layer_units in enumerate(self.layers_units):
             weights = self.add_weight('weights_{}'.format(index), [last_units, layer_units],
                                       dtype=tf.float32, initializer=initializer)
             self.all_weights.append(weights)
