@@ -16,7 +16,7 @@ n_inputs = 28 * 28
 n_hidden = (1000, 1000)
 n_outputs = n_inputs
 
-learning_rate = 0.01
+learning_rate = 0.001
 l2_reg = 0.001
 
 
@@ -88,7 +88,7 @@ class Stacked(tf.keras.layers.Layer):
 
 
 optimizer = tf.train.AdamOptimizer(learning_rate)
-model = Stacked(n_hidden, kl_div=True)
+model = Stacked(n_hidden, keepprob=0.7, kl_div=True)
 train_dataset = mnist.train('temp/mnist').batch(64).repeat(args.epochs)
 plt.axis('off')
 for index, (images, _) in enumerate(train_dataset):
