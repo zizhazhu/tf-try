@@ -22,11 +22,11 @@ l2_reg = 0.001
 
 class Stacked(tf.keras.layers.Layer):
 
-    def __init__(self, layers_units, noisy=False, dropout=None):
+    def __init__(self, layers_units, noisy=False, keepprob=None):
         super(Stacked, self).__init__()
         self.layers_units = layers_units
         self.noisy = noisy
-        self.dropout = dropout
+        self.keepprob = keepprob
 
         self.all_weights = []
         self.all_biases = []
@@ -52,14 +52,17 @@ class Stacked(tf.keras.layers.Layer):
         super().build(input_shape)
 
     def call(self, inputs, **kwargs):
-        if self.noisy:
+        if self.noisy and kwargs['is_train']:
             inputs = inputs + tf.random_normal(tf.shape(inputs))
+        if self.keepprob:
+            inputs = tf.layers.dropout(inputs, rate=(1-self.keepprob), training=kwargs['is_train'])
         layer = inputs
         for i in range(len(self.all_weights)):
             layer = layer @ self.all_weights[i] + self.all_biases[i]
         return layer
 
     def loss(self, X, y):
+        X = self(X, is_train=True)
         reconstruction_loss = tf.reduce_mean(tf.square(X - y))
         reg_loss = tfc.layers.apply_regularization(tfc.layers.l2_regularizer(l2_reg), self.variables)
         loss = tf.reduce_sum(reg_loss) + reconstruction_loss
@@ -72,13 +75,13 @@ train_dataset = mnist.train('temp/mnist').batch(64).repeat(args.epochs)
 plt.axis('off')
 for index, (images, _) in enumerate(train_dataset):
     with tf.GradientTape() as tape:
-        y = model(images)
-        loss = model.loss(images, y)
+        loss = model.loss(images, images)
     grads = tape.gradient(loss, model.variables)
     optimizer.apply_gradients(zip(grads, model.variables))
     if index % 100 == 0:
         print('step{}: {}'.format(index, loss))
         if args.show:
+            y = model(images, is_train=False)
             plt.suptitle(index)
             plt.subplot(121)
             plt.imshow(tf.reshape(images[0], [28, 28]))
