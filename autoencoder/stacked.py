@@ -21,9 +21,12 @@ l2_reg = 0.001
 
 class Stacked(tf.keras.layers.Layer):
 
-    def __init__(self, layers_units):
+    def __init__(self, layers_units, noisy=False, dropout=None):
         super(Stacked, self).__init__()
         self.layers_units = layers_units
+        self.noisy = noisy
+        self.dropout = dropout
+
         self.all_weights = []
         self.all_biases = []
 
@@ -48,6 +51,8 @@ class Stacked(tf.keras.layers.Layer):
         super().build(input_shape)
 
     def call(self, inputs, **kwargs):
+        if self.noisy:
+            inputs = inputs + tf.random_normal(tf.shape(inputs))
         layer = inputs
         for i in range(len(self.all_weights)):
             layer = layer @ self.all_weights[i] + self.all_biases[i]
@@ -61,7 +66,7 @@ class Stacked(tf.keras.layers.Layer):
 
 
 optimizer = tf.train.AdamOptimizer(learning_rate)
-model = Stacked(n_hidden)
+model = Stacked(n_hidden, True)
 train_dataset = mnist.train('temp/mnist').batch(64).repeat(1)
 plt.axis('off')
 for index, (images, _) in enumerate(train_dataset):
