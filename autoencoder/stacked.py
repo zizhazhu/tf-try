@@ -7,6 +7,7 @@ import data.mnist as mnist
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--show', action='store_true')
+parser.add_argument('--epochs', type=int, default=1)
 args = parser.parse_args()
 
 tf.enable_eager_execution()
@@ -67,7 +68,7 @@ class Stacked(tf.keras.layers.Layer):
 
 optimizer = tf.train.AdamOptimizer(learning_rate)
 model = Stacked(n_hidden, True)
-train_dataset = mnist.train('temp/mnist').batch(64).repeat(1)
+train_dataset = mnist.train('temp/mnist').batch(64).repeat(args.epochs)
 plt.axis('off')
 for index, (images, _) in enumerate(train_dataset):
     with tf.GradientTape() as tape:
